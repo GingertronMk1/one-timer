@@ -38,7 +38,13 @@ class ExpiringSecretController extends Controller
         foreach (preg_split('/\R/', $validated['recipients'] ?? '') as $recipient) {
             $recipient = trim($recipient);
             if ($recipient !== '') {
-                Mail::send('emails.expiring-secret', ['expiringSecret' => $expiringSecret], function ($message) use ($recipient): void {
+                $recipientSecret = $expiringSecret->replicate();
+                $recipientSecret->content = $validated['content'];
+                if (! $recipientSecret->save()) {
+                    throw new \Exception('There was an error saving this Expiring Secret. Please try again later.');
+                }
+
+                Mail::send('emails.expiring-secret', ['expiringSecret' => $recipientSecret], function ($message) use ($recipient): void {
                     $message->to($recipient)->subject('You have received a secret');
                 });
             }

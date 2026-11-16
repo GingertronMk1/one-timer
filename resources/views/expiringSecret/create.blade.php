@@ -61,7 +61,7 @@
                 @enderror
             </span>
             <span class="block"
-                >Enter one email address per line. Each recipient will receive a link to the secret and share its view
+                >Enter one email address per line. Each recipient will receive their own link with its own view
                 limit.</span>
             <textarea
                 name="recipients"
