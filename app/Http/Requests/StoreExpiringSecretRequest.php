@@ -27,7 +27,7 @@ class StoreExpiringSecretRequest extends FormRequest
     {
         return [
             'content' => ['required', 'string'],
-            'expires_in' => ['required', 'integer', 'min:0'],
+            'expires_in' => ['required', 'integer', 'min:1'],
             'expires_unit' => ['required', Rule::in(array_map(fn (UnitEnum $val) => $val->value, TimeUnit::cases()))],
             'remaining_views' => ['required', 'integer', 'min:0'],
         ];

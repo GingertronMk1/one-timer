@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Style and tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: pcov
+          extensions: mbstring, pdo_sqlite
+
+      - name: Locate Composer cache
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: ${{ runner.os }}-php-8.5-composer-
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          npm ci --ignore-scripts
+
+      - name: Prepare application
+        id: setup
+        run: |
+          cp .env.example .env
+          php artisan key:generate --no-interaction
+          npm run build
+
+      - name: Check PHP style
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: vendor/bin/pint --test
+
+      - name: Check frontend formatting
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: npm run format:check
+
+      - name: Run frontend lint
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: npm run lint --if-present
+
+      - name: Run frontend tests
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: npm run test --if-present
+
+      - name: Run tests with coverage
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: composer test
+
+  dependabot:
+    name: Merge Dependabot pull requests
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]' }}
+    needs: checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: gh pr merge --auto --merge --match-head-commit "$HEAD_SHA" "$PR_URL"

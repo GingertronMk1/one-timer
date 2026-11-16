@@ -54,6 +54,17 @@ test('rejects invalid secret details', function (string $field, mixed $value) {
     'views cannot be negative' => ['remaining_views', -1],
 ]);
 
+test('rejects expiry durations shorter than one unit', function (int $duration) {
+    $this->post(route('store'), [
+        'content' => 'secret',
+        'expires_in' => $duration,
+        'expires_unit' => 'hours',
+        'remaining_views' => 1,
+    ])->assertSessionHasErrors(['expires_in' => 'The expires in field must be at least 1.']);
+
+    $this->assertDatabaseCount('expiring_secrets', 0);
+})->with([0, -1]);
+
 test('shows a secret once, escaping its content and consuming its remaining view', function () {
     $this->travelTo('2026-01-01 12:00:00');
     $secret = ExpiringSecret::factory()->create([
