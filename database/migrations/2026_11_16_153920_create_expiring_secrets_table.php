@@ -12,8 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('expiring_secrets', function (Blueprint $table) {
-            $table->id();
-            $table->string('key')->unique();
+            $table->uuid('id')->primary();
             $table->longText('content');
             $table->dateTime('expires_at');
             $table->unsignedInteger('remaining_views');

@@ -22,14 +22,14 @@ class ExpiringSecretController extends Controller
     public function store(StoreExpiringSecretRequest $request)
     {
         $validated = $request->validated();
-        $expiresIn = $validated['expires_in'];
+        $expiresIn = intval($validated['expires_in']);
         $expiry = match ($validated['expires_unit']) {
-            TimeUnit::MINUTES => now()->addMinutes($expiresIn),
-            TimeUnit::HOURS => now()->addHours($expiresIn),
-            TimeUnit::DAYS => now()->addDays($expiresIn),
-            TimeUnit::WEEKS => now()->addWeeks($expiresIn),
-            TimeUnit::MONTHS => now()->addMonths($expiresIn),
-            TimeUnit::YEARS => now()->addYears($expiresIn),
+            TimeUnit::MINUTES->value => now()->addMinutes($expiresIn),
+            TimeUnit::HOURS->value => now()->addHours($expiresIn),
+            TimeUnit::DAYS->value => now()->addDays($expiresIn),
+            TimeUnit::WEEKS->value => now()->addWeeks($expiresIn),
+            TimeUnit::MONTHS->value => now()->addMonths($expiresIn),
+            TimeUnit::YEARS->value => now()->addYears($expiresIn),
         };
         $expiringSecret = new ExpiringSecret();
         $expiringSecret->expires_at = $expiry;
@@ -49,6 +49,10 @@ class ExpiringSecretController extends Controller
      */
     public function show(ExpiringSecret $expiringSecret)
     {
-        //
+        if (!$expiringSecret->canView()) {
+            abort(404);
+        }
+        $expiringSecret->removeView();
+        return view('expiringSecret.show', ['expiringSecret' => $expiringSecret]);
     }
 }

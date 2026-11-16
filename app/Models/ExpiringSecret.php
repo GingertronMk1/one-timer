@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -9,6 +10,7 @@ class ExpiringSecret extends Model
 {
     /** @use HasFactory<\Database\Factories\ExpiringSecretFactory> */
     use HasFactory;
+    use HasUuids;
 
     protected function casts(): array
     {
@@ -16,5 +18,16 @@ class ExpiringSecret extends Model
             'content' => 'encrypted',
             'expires_at' => 'datetime',
         ];
+    }
+
+    public function removeView(): bool
+    {
+        $this->remaining_views--;
+        return $this->save();
+    }
+
+    public function canView(): bool
+    {
+        return $this->remaining_views > 0 && $this->expires_at > now();
     }
 }
