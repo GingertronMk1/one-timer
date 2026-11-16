@@ -5,21 +5,16 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreExpiringSecretRequest;
 use App\Models\ExpiringSecret;
 use App\TimeUnit;
+use Illuminate\Contracts\View\View;
 
 class ExpiringSecretController extends Controller
 {
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function create(): View
     {
         return view('expiringSecret.create');
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(StoreExpiringSecretRequest $request)
+    public function store(StoreExpiringSecretRequest $request): View
     {
         $validated = $request->validated();
         $expiresIn = intval($validated['expires_in']);
@@ -45,10 +40,7 @@ class ExpiringSecretController extends Controller
 
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(ExpiringSecret $expiringSecret)
+    public function show(ExpiringSecret $expiringSecret): View
     {
         if (! $expiringSecret->canView()) {
             abort(404);
