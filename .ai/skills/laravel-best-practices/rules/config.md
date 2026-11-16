@@ -2,7 +2,7 @@
 
 ## Read environment variables in configuration files
 
-Call `env()` only from configuration files. After you cache the configuration, Laravel does not load the application's `.env` file, so read configuration values in application code through `config()`.
+Call `env()` only from configuration files. After you cache the configuration, Laravel does not load the application's `../../../../.env` file, so read configuration values in application code through `config()`.
 
 Incorrect:
 

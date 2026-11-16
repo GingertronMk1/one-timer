@@ -21,7 +21,7 @@ class InvalidOrderException extends Exception
 }
 ```
 
-Centralized callbacks in `bootstrap/app.php` keep the application's exception policy together:
+Centralized callbacks in `../../../../bootstrap/app.php` keep the application's exception policy together:
 
 ```php
 ->withExceptions(function (Exceptions $exceptions) {

@@ -29,11 +29,11 @@ Fan out when you can. The checklist groups are independent, so they can run in p
 
 ### Step 0: Orient
 
-Read `composer.json` (installed packages tell you which checklist groups apply), the `pint.json` / PHPStan / Rector config, `.ai/rules/index.md` if present, and most important, map the `app/` tree. List every directory under `app/` (and any `Modules/`, `src/`, `packages/`, or domain root). Every folder beyond Laravel's default skeleton (`Http`, `Models`, `Providers`, `Console`, `Exceptions`) is a structural pattern the app committed to and a candidate for a high-value rule: `Actions`, `Services`, `Data` or DTOs, `Queries`, `Repositories`, `ViewModels`, `Pipelines`, `Support`, `Enums`, `Contracts`, `Observers`, or `Domain` and module roots. Note each one. You will confirm how it is used in Step 2.
+Read `../../../composer.json` (installed packages tell you which checklist groups apply), the `pint.json` / PHPStan / Rector config, `.ai/rules/index.md` if present, and most important, map the `app/` tree. List every directory under `app/` (and any `Modules/`, `src/`, `packages/`, or domain root). Every folder beyond Laravel's default skeleton (`Http`, `Models`, `Providers`, `Console`, `Exceptions`) is a structural pattern the app committed to and a candidate for a high-value rule: `Actions`, `Services`, `Data` or DTOs, `Queries`, `Repositories`, `ViewModels`, `Pipelines`, `Support`, `Enums`, `Contracts`, `Observers`, or `Domain` and module roots. Note each one. You will confirm how it is used in Step 2.
 
-This app has no Livewire/Inertia/Flux packages installed. Treat the frontend group as likely API-only: confirm from `resources/views` before spending time there, and skip the Livewire/Inertia/Flux dimensions.
+This app has no Livewire/Inertia/Flux packages installed. Treat the frontend group as likely API-only: confirm from `../../../resources/views` before spending time there, and skip the Livewire/Inertia/Flux dimensions.
 
-Done when: you have the applicable checklist groups, the dimensions already recorded in `.ai/rules`, and a list of every non-default `app/` directory mapped to the pattern it represents.
+Done when: you have the applicable checklist groups, the dimensions already recorded in `.ai/rules`, and a list of every non-default `../../../app` directory mapped to the pattern it represents.
 
 ### Step 1: Predefined sweep
 
@@ -49,11 +49,11 @@ Done when: every applicable dimension carries exactly one of those verdicts.
 
 ### Step 2: Open-ended pass
 
-First, close out the architecture map from Step 0. For every non-default `app/` directory you listed, confirm how the pattern is used and apply the same evidence and decisions-not-defaults tests as Step 1. Generator-standard or sparsely used directories such as `Rules`, `Observers`, `Mail`, and `Notifications` are signals to inspect, not automatic conventions. Make genuine structural patterns candidates: Action classes invoked via `handle` / `execute` / `__invoke`, Services constructor-injected, `Queries` objects exposing `builder(): Builder`, DTOs as readonly classes or spatie/laravel-data, module or domain folders as the unit of organization. Scope each qualifying pattern to its own directory glob. Also record a consistent deliberate absence, such as "no repository layer, controllers query Eloquent directly", so the next agent matches the app's altitude.
+First, close out the architecture map from Step 0. For every non-default `../../../app` directory you listed, confirm how the pattern is used and apply the same evidence and decisions-not-defaults tests as Step 1. Generator-standard or sparsely used directories such as `Rules`, `Observers`, `Mail`, and `Notifications` are signals to inspect, not automatic conventions. Make genuine structural patterns candidates: Action classes invoked via `handle` / `execute` / `__invoke`, Services constructor-injected, `Queries` objects exposing `builder(): Builder`, DTOs as readonly classes or spatie/laravel-data, module or domain folders as the unit of organization. Scope each qualifying pattern to its own directory glob. Also record a consistent deliberate absence, such as "no repository layer, controllers query Eloquent directly", so the next agent matches the app's altitude.
 
 Then find the other patterns specific to this codebase: base or abstract classes most code extends, traits used everywhere, tenancy or authorization scoping woven through queries, naming schemes, and custom helpers. Same evidence bar, cite files. Record every genuine structural pattern, and cap the other house findings at ~5 so the pass stays high-signal.
 
-Done when: every non-default `app/` directory from Step 0 has a verdict, and the pass has produced its cited house findings (or concluded there are none).
+Done when: every non-default `../../../app` directory from Step 0 has a verdict, and the pass has produced its cited house findings (or concluded there are none).
 
 ### Step 3: Confirm
 
@@ -83,7 +83,7 @@ List recorded rules (file and title), conflicts the user deferred, notable no-si
 
 ## Glob mapping
 
-Attach each rule to the most specific path that covers its evidence. Do not use `app/**` when a subtree fits. Match the glob to where the code lives, which is not the same in a default skeleton and in a modular or DDD layout. Use the Step 0 `app/` map to pick the real path.
+Attach each rule to the most specific path that covers its evidence. Do not use `app/**` when a subtree fits. Match the glob to where the code lives, which is not the same in a default skeleton and in a modular or DDD layout. Use the Step 0 `../../../app` map to pick the real path.
 
 Examples:
 

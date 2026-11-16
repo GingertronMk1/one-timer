@@ -9,7 +9,7 @@ Measure before changing a setting. Find the slow test first, and apply a project
 
 ## Test environment
 
-- Set `BCRYPT_ROUNDS=4` in `.env.testing` or in `phpunit.xml`. The default value is 12, and the hash then takes most of the time of each test that signs a user in.
+- Set `BCRYPT_ROUNDS=4` in `.env.testing` or in `../../../../phpunit.xml`. The default value is 12, and the hash then takes most of the time of each test that signs a user in.
 - Disable Xdebug. Unless the run needs coverage, disable pcov too.
 - Disable packages that perform work on every request in the test environment. Examples are Pulse, Telescope, and Nightwatch.
 - Use the `WithCachedConfig` and `WithCachedRoutes` traits, so the run does not parse the configuration and the routes for every test.
