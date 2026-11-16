@@ -13,65 +13,88 @@ jobs:
   checks:
     name: Style and tests
     runs-on: ubuntu-latest
+    env:
+      WWWGROUP: 1001
+      WWWUSER: 1001
+      DB_DATABASE: sail
+      DB_USERNAME: sail
+      DB_PASSWORD: password
     steps:
       - name: Check out code
         uses: actions/checkout@v4
 
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.5'
-          coverage: pcov
-          extensions: mbstring, pdo_sqlite
+      - name: Prepare Sail
+        run: |
+          cp .env.example .env
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --volume "$PWD:/app" \
+            --workdir /app \
+            composer:2 install --no-interaction --prefer-dist --no-progress --no-scripts --ignore-platform-reqs
 
-      - name: Locate Composer cache
-        id: composer-cache
-        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache Composer downloads
+      - name: Cache Sail images
+        id: sail-images
         uses: actions/cache@v4
         with:
-          path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
-          restore-keys: ${{ runner.os }}-php-8.5-composer-
+          path: /tmp/sail-images.tar
+          key: ${{ runner.os }}-sail-images-${{ hashFiles('composer.lock', 'compose.yaml') }}
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
+      - name: Restore Sail images
+        if: steps.sail-images.outputs.cache-hit == 'true'
+        run: docker load --input /tmp/sail-images.tar
+
+      - name: Build and cache Sail images
+        if: steps.sail-images.outputs.cache-hit != 'true'
+        run: |
+          vendor/bin/sail build
+          docker compose pull --ignore-buildable
+          mapfile -t images < <(docker compose config --images)
+          docker save --output /tmp/sail-images.tar "${images[@]}"
+
+      - name: Start Sail
+        run: vendor/bin/sail up -d --no-build
 
       - name: Install dependencies
         run: |
-          composer install --no-interaction --prefer-dist --no-progress
-          npm ci --ignore-scripts
+          vendor/bin/sail composer install --no-interaction --prefer-dist --no-progress
+          vendor/bin/sail npm ci --ignore-scripts
 
       - name: Prepare application
         id: setup
         run: |
-          cp .env.example .env
-          php artisan key:generate --no-interaction
-          npm run build
+          vendor/bin/sail artisan key:generate --no-interaction
+          vendor/bin/sail npm run build
 
       - name: Check PHP style
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: vendor/bin/pint --test
+        run: vendor/bin/sail bin pint --test
 
       - name: Check frontend formatting
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: npm run format:check
-
-      - name: Run frontend lint
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: npm run lint --if-present
-
-      - name: Run frontend tests
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: npm run test --if-present
+        run: vendor/bin/sail npm run format:check
 
       - name: Run tests with coverage
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: composer test
+        run: vendor/bin/sail composer test
+
+      - name: Run browser tests
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: |
+          cp .env .env.dusk.local
+          printf '\nAPP_URL=http://laravel.test\nDB_CONNECTION=sqlite\nDB_DATABASE=/var/www/html/database/dusk.sqlite\nSESSION_DRIVER=file\n' >> .env.dusk.local
+          touch database/dusk.sqlite
+          vendor/bin/sail dusk
+
+      - name: Upload browser test artifacts
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-artifacts
+          path: |
+            tests/Browser/screenshots
+            tests/Browser/console
+            tests/Browser/source
+          if-no-files-found: ignore
 
   dependabot:
     name: Merge Dependabot pull requests
@@ -87,4 +110,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: gh pr merge --auto --merge --match-head-commit "$HEAD_SHA" "$PR_URL"
+        run: gh pr merge --auto --squash --match-head-commit "$HEAD_SHA" "$PR_URL"
