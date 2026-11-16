@@ -16,6 +16,9 @@ jobs:
     env:
       WWWGROUP: 1001
       WWWUSER: 1001
+      DB_DATABASE: sail
+      DB_USERNAME: sail
+      DB_PASSWORD: password
     steps:
       - name: Check out code
         uses: actions/checkout@v4
