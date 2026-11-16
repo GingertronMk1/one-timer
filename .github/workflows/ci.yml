@@ -34,7 +34,7 @@ jobs:
 
       - name: Cache Sail images
         id: sail-images
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: /tmp/sail-images.tar
           key: ${{ runner.os }}-sail-images-${{ hashFiles('composer.lock', 'compose.yaml') }}
