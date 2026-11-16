@@ -14,7 +14,7 @@
                 placeholder="Write your expiring secret here"
                 rows="10"
                 class="w-full rounded-md border-2 border-black p-2"
-            ></textarea>
+            >{{ old('content') }}</textarea>
         </label>
         <div class="flex flex-row items-center gap-4">
             <label for="expires_in">
@@ -53,6 +53,24 @@
             />
             <span>times</span>
         </div>
+        <label for="recipients">
+            <span class="flex flex-row items-center">
+                <span class="mr-auto text-2xl">Email recipients (optional)</span>
+                @error('recipients')
+                    <span class="text-red-500">{{ $message }}</span>
+                @enderror
+            </span>
+            <span class="block"
+                >Enter one email address per line. Each recipient will receive a link to the secret and share its view
+                limit.</span>
+            <textarea
+                name="recipients"
+                id="recipients"
+                rows="4"
+                placeholder="person@example.com"
+                class="w-full rounded-md border-2 border-black p-2"
+            >{{ old('recipients') }}</textarea>
+        </label>
         <x-app-button type="submit"> Create </x-app-button>
     </form>
 </x-app-layout>

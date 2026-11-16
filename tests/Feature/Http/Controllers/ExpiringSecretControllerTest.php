@@ -3,8 +3,43 @@
 use App\Models\ExpiringSecret;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 
 uses(LazilyRefreshDatabase::class);
+
+test('emails each recipient a link to the secret', function () {
+    $this->post(route('store'), [
+        'content' => 'private message',
+        'expires_in' => 1,
+        'expires_unit' => 'hours',
+        'remaining_views' => 2,
+        'recipients' => " first@example.com \r\n\r\nsecond@example.com",
+    ])->assertOk();
+
+    $secret = ExpiringSecret::query()->sole();
+    $messages = Mail::mailer()->getSymfonyTransport()->messages();
+    expect($messages)->toHaveCount(2);
+    expect($messages->map(fn ($message) => $message->getOriginalMessage()->getTo()[0]->getAddress())->all())
+        ->toBe(['first@example.com', 'second@example.com']);
+    foreach ($messages as $message) {
+        expect($message->getOriginalMessage()->getHtmlBody())
+            ->toContain(route('show', $secret))
+            ->not->toContain('private message');
+    }
+});
+
+test('rejects invalid recipient addresses before creating a secret', function () {
+    $this->post(route('store'), [
+        'content' => 'private message',
+        'expires_in' => 1,
+        'expires_unit' => 'hours',
+        'remaining_views' => 1,
+        'recipients' => "valid@example.com\ninvalid address",
+    ])->assertSessionHasErrors('recipients');
+
+    $this->assertDatabaseCount('expiring_secrets', 0);
+    expect(Mail::mailer()->getSymfonyTransport()->messages())->toBeEmpty();
+});
 
 test('creates an encrypted secret with the requested expiry', function (string $unit, string $expectedExpiry) {
     $this->travelTo('2026-01-01 12:00:00');
