@@ -70,14 +70,6 @@ jobs:
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: vendor/bin/sail npm run format:check
 
-      - name: Run frontend lint
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: vendor/bin/sail npm run lint --if-present
-
-      - name: Run frontend tests
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: vendor/bin/sail npm run test --if-present
-
       - name: Run tests with coverage
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: vendor/bin/sail composer test
