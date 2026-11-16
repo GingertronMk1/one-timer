@@ -36,9 +36,8 @@ class StoreExpiringSecretRequest extends FormRequest
                     return;
                 }
 
-                foreach (preg_split('/\R/', $value) as $address) {
-                    $address = trim($address);
-                    if ($address !== '' && Validator::make(['email' => $address], ['email' => 'email'])->fails()) {
+                foreach ($this->recipients() as $address) {
+                    if (Validator::make(['email' => $address], ['email' => 'email'])->fails()) {
                         $fail('Each recipient must be a valid email address, one per line.');
 
                         return;
@@ -46,5 +45,22 @@ class StoreExpiringSecretRequest extends FormRequest
                 }
             }],
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function recipients(): array
+    {
+        $recipients = $this->input('recipients');
+
+        if (! is_string($recipients)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            array_map('trim', preg_split('/\R/', $recipients)),
+            fn (string $recipient): bool => $recipient !== '',
+        ));
     }
 }

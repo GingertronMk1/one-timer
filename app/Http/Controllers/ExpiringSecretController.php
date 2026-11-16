@@ -31,7 +31,7 @@ class ExpiringSecretController extends Controller
         $expiringSecret->expires_at = $expiry;
         $expiringSecret->content = $validated['content'];
         $expiringSecret->remaining_views = $validated['remaining_views'];
-        $recipients = array_values(array_filter(array_map('trim', preg_split('/\R/', $validated['recipients'] ?? '')), fn (string $recipient): bool => $recipient !== ''));
+        $recipients = $request->recipients();
 
         if ($recipients === [] && ! $expiringSecret->save()) {
             throw new \Exception('There was an error saving this Expiring Secret. Please try again later.');
