@@ -31,27 +31,27 @@ class ExpiringSecretController extends Controller
         $expiringSecret->expires_at = $expiry;
         $expiringSecret->content = $validated['content'];
         $expiringSecret->remaining_views = $validated['remaining_views'];
-        if (! $expiringSecret->save()) {
+        $recipients = array_values(array_filter(array_map('trim', preg_split('/\R/', $validated['recipients'] ?? '')), fn (string $recipient): bool => $recipient !== ''));
+
+        if ($recipients === [] && ! $expiringSecret->save()) {
             throw new \Exception('There was an error saving this Expiring Secret. Please try again later.');
         }
 
-        foreach (preg_split('/\R/', $validated['recipients'] ?? '') as $recipient) {
-            $recipient = trim($recipient);
-            if ($recipient !== '') {
-                $recipientSecret = $expiringSecret->replicate();
-                $recipientSecret->content = $validated['content'];
-                if (! $recipientSecret->save()) {
-                    throw new \Exception('There was an error saving this Expiring Secret. Please try again later.');
-                }
-
-                Mail::send('emails.expiring-secret', ['expiringSecret' => $recipientSecret], function ($message) use ($recipient): void {
-                    $message->to($recipient)->subject('You have received a secret');
-                });
+        foreach ($recipients as $recipient) {
+            $recipientSecret = $expiringSecret->replicate();
+            $recipientSecret->content = $validated['content'];
+            if (! $recipientSecret->save()) {
+                throw new \Exception('There was an error saving this Expiring Secret. Please try again later.');
             }
+
+            Mail::send('emails.expiring-secret', ['expiringSecret' => $recipientSecret], function ($message) use ($recipient): void {
+                $message->to($recipient)->subject('You have received a secret');
+            });
         }
 
         return view('expiringSecret.store', [
             'expiringSecret' => $expiringSecret,
+            'recipientCount' => count($recipients),
         ]);
 
     }

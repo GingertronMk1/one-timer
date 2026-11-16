@@ -18,16 +18,15 @@ test('emails each recipient a unique secret with an independent view limit', fun
     ])->assertOk();
 
     $secrets = ExpiringSecret::query()->get();
-    expect($secrets)->toHaveCount(3);
-    $senderSecret = $response->viewData('expiringSecret');
-    $recipientSecrets = $secrets->where('id', '!=', $senderSecret->id)->values();
+    expect($secrets)->toHaveCount(2);
+    $recipientSecrets = $secrets->values();
+    $response->assertSee('Secret sent to 2 users')->assertDontSee('<input', false);
     $messages = Mail::mailer()->getSymfonyTransport()->messages();
     expect($messages)->toHaveCount(2);
     expect($messages->map(fn ($message) => $message->getOriginalMessage()->getTo()[0]->getAddress())->all())
         ->toBe(['first@example.com', 'second@example.com']);
     foreach ($messages as $message) {
         expect($message->getOriginalMessage()->getHtmlBody())
-            ->not->toContain(route('show', $senderSecret))
             ->not->toContain('private message');
     }
     foreach ($recipientSecrets as $secret) {
@@ -40,7 +39,30 @@ test('emails each recipient a unique secret with an independent view limit', fun
     $this->get(route('show', $recipientSecrets[0]))->assertOk();
     $this->get(route('show', $recipientSecrets[0]))->assertNotFound();
     $this->get(route('show', $recipientSecrets[1]))->assertOk();
-    $this->get(route('show', $senderSecret))->assertOk();
+});
+
+test('confirms delivery to one user', function () {
+    $this->post(route('store'), [
+        'content' => 'private message',
+        'expires_in' => 1,
+        'expires_unit' => 'hours',
+        'remaining_views' => 1,
+        'recipients' => 'person@example.com',
+    ])->assertOk()->assertSee('Secret sent to 1 user')->assertDontSee('<input', false);
+
+    $this->assertDatabaseCount('expiring_secrets', 1);
+});
+
+test('shows a shareable link when the recipient field contains only blank lines', function () {
+    $response = $this->post(route('store'), [
+        'content' => 'private message',
+        'expires_in' => 1,
+        'expires_unit' => 'hours',
+        'remaining_views' => 1,
+        'recipients' => " \n ",
+    ])->assertOk()->assertDontSee('Secret sent to');
+
+    $response->assertSee(route('show', ExpiringSecret::query()->sole()));
 });
 
 test('rejects invalid recipient addresses before creating a secret', function () {
