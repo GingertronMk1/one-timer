@@ -57,9 +57,9 @@
             >
             <span>times</span>
         </div>
-        <button type="submit" class="px-4 py-2 rounded-sm bg-blue-800 text-white cursor-pointer">
+        <x-app-button type="submit">
             Create
-        </button>
+        </x-app-button>
     </form>
 
 </x-app-layout>

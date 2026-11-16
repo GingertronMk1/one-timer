@@ -1,5 +1,7 @@
 @props(['expiringSecret'])
 <x-app-layout>
-    {{ route('show', ['expiringSecret' => $expiringSecret->id]) }}
-    <a href="{{ route('create') }}">Make another</a>
+    <input type="text" readonly value="{{ route('show', ['expiringSecret' => $expiringSecret->id]) }}" />
+    <x-app-button as="a" href="{{ route('create') }}">
+        Make another
+    </x-app-button>
 </x-app-layout>
