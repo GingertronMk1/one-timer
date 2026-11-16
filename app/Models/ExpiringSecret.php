@@ -2,14 +2,16 @@
 
 namespace App\Models;
 
+use Database\Factories\ExpiringSecretFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ExpiringSecret extends Model
 {
-    /** @use HasFactory<\Database\Factories\ExpiringSecretFactory> */
+    /** @use HasFactory<ExpiringSecretFactory> */
     use HasFactory;
+
     use HasUuids;
 
     protected function casts(): array
@@ -23,6 +25,7 @@ class ExpiringSecret extends Model
     public function removeView(): bool
     {
         $this->remaining_views--;
+
         return $this->save();
     }
 

@@ -1,3 +1,1 @@
-<x-app-layout>
-    {{ $expiringSecret->content }}
-</x-app-layout>
+<x-app-layout> {{ $expiringSecret->content }} </x-app-layout>

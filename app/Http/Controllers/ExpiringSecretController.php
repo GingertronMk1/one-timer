@@ -31,13 +31,14 @@ class ExpiringSecretController extends Controller
             TimeUnit::MONTHS->value => now()->addMonths($expiresIn),
             TimeUnit::YEARS->value => now()->addYears($expiresIn),
         };
-        $expiringSecret = new ExpiringSecret();
+        $expiringSecret = new ExpiringSecret;
         $expiringSecret->expires_at = $expiry;
         $expiringSecret->content = $validated['content'];
         $expiringSecret->remaining_views = $validated['remaining_views'];
-        if (!$expiringSecret->save()) {
+        if (! $expiringSecret->save()) {
             throw new \Exception('There was an error saving this Expiring Secret. Please try again later.');
         }
+
         return view('expiringSecret.store', [
             'expiringSecret' => $expiringSecret,
         ]);
@@ -49,10 +50,11 @@ class ExpiringSecretController extends Controller
      */
     public function show(ExpiringSecret $expiringSecret)
     {
-        if (!$expiringSecret->canView()) {
+        if (! $expiringSecret->canView()) {
             abort(404);
         }
         $expiringSecret->removeView();
+
         return view('expiringSecret.show', ['expiringSecret' => $expiringSecret]);
     }
 }
