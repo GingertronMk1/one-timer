@@ -6,6 +6,7 @@ use App\Http\Requests\StoreExpiringSecretRequest;
 use App\Models\ExpiringSecret;
 use App\TimeUnit;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Mail;
 
 class ExpiringSecretController extends Controller
 {
@@ -30,12 +31,27 @@ class ExpiringSecretController extends Controller
         $expiringSecret->expires_at = $expiry;
         $expiringSecret->content = $validated['content'];
         $expiringSecret->remaining_views = $validated['remaining_views'];
-        if (! $expiringSecret->save()) {
+        $recipients = $request->recipients();
+
+        if ($recipients === [] && ! $expiringSecret->save()) {
             throw new \Exception('There was an error saving this Expiring Secret. Please try again later.');
+        }
+
+        foreach ($recipients as $recipient) {
+            $recipientSecret = $expiringSecret->replicate();
+            $recipientSecret->content = $validated['content'];
+            if (! $recipientSecret->save()) {
+                throw new \Exception('There was an error saving this Expiring Secret. Please try again later.');
+            }
+
+            Mail::send('emails.expiring-secret', ['expiringSecret' => $recipientSecret], function ($message) use ($recipient): void {
+                $message->to($recipient)->subject('You have received a secret');
+            });
         }
 
         return view('expiringSecret.store', [
             'expiringSecret' => $expiringSecret,
+            'recipientCount' => count($recipients),
         ]);
 
     }

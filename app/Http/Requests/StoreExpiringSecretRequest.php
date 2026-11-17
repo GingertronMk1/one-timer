@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\TimeUnit;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use UnitEnum;
 
@@ -30,6 +31,36 @@ class StoreExpiringSecretRequest extends FormRequest
             'expires_in' => ['required', 'integer', 'min:1'],
             'expires_unit' => ['required', Rule::in(array_map(fn (UnitEnum $val) => $val->value, TimeUnit::cases()))],
             'remaining_views' => ['required', 'integer', 'min:0'],
+            'recipients' => ['nullable', 'string', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (! is_string($value)) {
+                    return;
+                }
+
+                foreach ($this->recipients() as $address) {
+                    if (Validator::make(['email' => $address], ['email' => 'email'])->fails()) {
+                        $fail('Each recipient must be a valid email address, one per line.');
+
+                        return;
+                    }
+                }
+            }],
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function recipients(): array
+    {
+        $recipients = $this->input('recipients');
+
+        if (! is_string($recipients)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            array_map('trim', preg_split('/\R/', $recipients)),
+            fn (string $recipient): bool => $recipient !== '',
+        ));
     }
 }

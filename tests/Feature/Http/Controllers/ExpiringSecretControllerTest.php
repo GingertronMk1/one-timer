@@ -3,8 +3,80 @@
 use App\Models\ExpiringSecret;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 
 uses(LazilyRefreshDatabase::class);
+
+test('emails each recipient a unique secret with an independent view limit', function () {
+    $this->travelTo('2026-01-01 12:00:00');
+    $response = $this->post(route('store'), [
+        'content' => 'private message',
+        'expires_in' => 1,
+        'expires_unit' => 'hours',
+        'remaining_views' => 1,
+        'recipients' => " first@example.com \r\n\r\nsecond@example.com",
+    ])->assertOk();
+
+    $secrets = ExpiringSecret::query()->get();
+    expect($secrets)->toHaveCount(2);
+    $recipientSecrets = $secrets->values();
+    $response->assertSee('Secret sent to 2 users')->assertDontSee('<input', false);
+    $messages = Mail::mailer()->getSymfonyTransport()->messages();
+    expect($messages)->toHaveCount(2);
+    expect($messages->map(fn ($message) => $message->getOriginalMessage()->getTo()[0]->getAddress())->all())
+        ->toBe(['first@example.com', 'second@example.com']);
+    foreach ($messages as $message) {
+        expect($message->getOriginalMessage()->getHtmlBody())
+            ->not->toContain('private message');
+    }
+    foreach ($recipientSecrets as $secret) {
+        expect($messages->filter(fn ($message) => str_contains($message->getOriginalMessage()->getHtmlBody(), route('show', $secret))))->toHaveCount(1);
+        expect($secret->content)->toBe('private message');
+        expect($secret->expires_at->format('Y-m-d H:i:s'))->toBe('2026-01-01 13:00:00');
+        expect($secret->remaining_views)->toBe(1);
+    }
+
+    $this->get(route('show', $recipientSecrets[0]))->assertOk();
+    $this->get(route('show', $recipientSecrets[0]))->assertNotFound();
+    $this->get(route('show', $recipientSecrets[1]))->assertOk();
+});
+
+test('confirms delivery to one user', function () {
+    $this->post(route('store'), [
+        'content' => 'private message',
+        'expires_in' => 1,
+        'expires_unit' => 'hours',
+        'remaining_views' => 1,
+        'recipients' => 'person@example.com',
+    ])->assertOk()->assertSee('Secret sent to 1 user')->assertDontSee('<input', false);
+
+    $this->assertDatabaseCount('expiring_secrets', 1);
+});
+
+test('shows a shareable link when the recipient field contains only blank lines', function () {
+    $response = $this->post(route('store'), [
+        'content' => 'private message',
+        'expires_in' => 1,
+        'expires_unit' => 'hours',
+        'remaining_views' => 1,
+        'recipients' => " \n ",
+    ])->assertOk()->assertDontSee('Secret sent to');
+
+    $response->assertSee(route('show', ExpiringSecret::query()->sole()));
+});
+
+test('rejects invalid recipient addresses before creating a secret', function () {
+    $this->post(route('store'), [
+        'content' => 'private message',
+        'expires_in' => 1,
+        'expires_unit' => 'hours',
+        'remaining_views' => 1,
+        'recipients' => "valid@example.com\ninvalid address",
+    ])->assertSessionHasErrors('recipients');
+
+    $this->assertDatabaseCount('expiring_secrets', 0);
+    expect(Mail::mailer()->getSymfonyTransport()->messages())->toBeEmpty();
+});
 
 test('creates an encrypted secret with the requested expiry', function (string $unit, string $expectedExpiry) {
     $this->travelTo('2026-01-01 12:00:00');
