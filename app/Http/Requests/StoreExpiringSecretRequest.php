@@ -27,16 +27,16 @@ class StoreExpiringSecretRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'content' => ['required', 'string'],
-            'expires_in' => ['required', 'integer', 'min:1'],
-            'expires_unit' => ['required', Rule::in(array_map(fn (UnitEnum $val) => $val->value, TimeUnit::cases()))],
-            'recipients' => ['nullable', 'string', function (string $attribute, mixed $value, \Closure $fail): void {
+            'content' => [Rule::required(), Rule::string()],
+            'expires_in' => [Rule::required(), Rule::numeric()->integer()->min(1)],
+            'expires_unit' => [Rule::required(), Rule::in(array_map(fn (UnitEnum $val) => $val->value, TimeUnit::cases()))],
+            'recipients' => [Rule::nullable(), Rule::string(), function (string $attribute, mixed $value, \Closure $fail): void {
                 if (! is_string($value)) {
                     return;
                 }
 
                 foreach ($this->recipients() as $address) {
-                    if (Validator::make(['email' => $address], ['email' => 'email'])->fails()) {
+                    if (Validator::make(['email' => $address], ['email' => [Rule::email()]])->fails()) {
                         $fail('Each recipient must be a valid email address, one per line.');
 
                         return;
