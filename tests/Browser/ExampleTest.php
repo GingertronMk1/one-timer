@@ -6,8 +6,8 @@ use Laravel\Dusk\Browser;
 
 uses(DatabaseMigrations::class);
 
-test('a secret can be shared and viewed once', function () {
-    Http::retry(20, 250)->get(config('app.url'))->throw();
+test('a secret can be shared and viewed repeatedly before expiry', function () {
+    Http::retry(20, 250)->get(config()->string('app.url'))->throw();
 
     $this->browse(function (Browser $browser) {
         $browser->visit('/')
@@ -17,9 +17,13 @@ test('a secret can be shared and viewed once', function () {
 
         $secretUrl = $browser->value('input[readonly]');
 
+        if (! is_string($secretUrl)) {
+            throw new RuntimeException('The secret URL was not found.');
+        }
+
         $browser->visit($secretUrl)
             ->assertSee('A private message')
             ->refresh()
-            ->assertDontSee('A private message');
+            ->assertSee('A private message');
     });
 });

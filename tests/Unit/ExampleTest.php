@@ -1,5 +1,7 @@
 <?php
 
-test('that true is true', function () {
-    expect(true)->toBeTrue();
+use App\TimeUnit;
+
+test('expiry units have their expected values', function () {
+    expect(TimeUnit::from('hours'))->toBe(TimeUnit::HOURS);
 });

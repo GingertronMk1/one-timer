@@ -6,6 +6,7 @@ use App\Http\Requests\StoreExpiringSecretRequest;
 use App\Models\ExpiringSecret;
 use App\TimeUnit;
 use Illuminate\Contracts\View\View;
+use Illuminate\Mail\Message;
 use Illuminate\Support\Facades\Mail;
 
 class ExpiringSecretController extends Controller
@@ -17,20 +18,19 @@ class ExpiringSecretController extends Controller
 
     public function store(StoreExpiringSecretRequest $request): View
     {
-        $validated = $request->validated();
-        $expiresIn = intval($validated['expires_in']);
-        $expiry = match ($validated['expires_unit']) {
-            TimeUnit::MINUTES->value => now()->addMinutes($expiresIn),
-            TimeUnit::HOURS->value => now()->addHours($expiresIn),
-            TimeUnit::DAYS->value => now()->addDays($expiresIn),
-            TimeUnit::WEEKS->value => now()->addWeeks($expiresIn),
-            TimeUnit::MONTHS->value => now()->addMonths($expiresIn),
-            TimeUnit::YEARS->value => now()->addYears($expiresIn),
+        $expiresIn = $request->integer('expires_in');
+        $content = $request->string('content')->toString();
+        $expiry = match (TimeUnit::from($request->string('expires_unit')->toString())) {
+            TimeUnit::MINUTES => now()->addMinutes($expiresIn),
+            TimeUnit::HOURS => now()->addHours($expiresIn),
+            TimeUnit::DAYS => now()->addDays($expiresIn),
+            TimeUnit::WEEKS => now()->addWeeks($expiresIn),
+            TimeUnit::MONTHS => now()->addMonths($expiresIn),
+            TimeUnit::YEARS => now()->addYears($expiresIn),
         };
         $expiringSecret = new ExpiringSecret;
         $expiringSecret->expires_at = $expiry;
-        $expiringSecret->content = $validated['content'];
-        $expiringSecret->remaining_views = $validated['remaining_views'];
+        $expiringSecret->content = $content;
         $recipients = $request->recipients();
 
         if ($recipients === [] && ! $expiringSecret->save()) {
@@ -39,12 +39,12 @@ class ExpiringSecretController extends Controller
 
         foreach ($recipients as $recipient) {
             $recipientSecret = $expiringSecret->replicate();
-            $recipientSecret->content = $validated['content'];
+            $recipientSecret->content = $content;
             if (! $recipientSecret->save()) {
                 throw new \Exception('There was an error saving this Expiring Secret. Please try again later.');
             }
 
-            Mail::send('emails.expiring-secret', ['expiringSecret' => $recipientSecret], function ($message) use ($recipient): void {
+            Mail::send('emails.expiring-secret', ['expiringSecret' => $recipientSecret], function (Message $message) use ($recipient): void {
                 $message->to($recipient)->subject('You have received a secret');
             });
         }
@@ -58,10 +58,11 @@ class ExpiringSecretController extends Controller
 
     public function show(ExpiringSecret $expiringSecret): View
     {
-        if (! $expiringSecret->canView()) {
+        if ($expiringSecret->expires_at <= now()) {
+            $expiringSecret->delete();
+
             abort(404);
         }
-        $expiringSecret->removeView();
 
         return view('expiringSecret.show', ['expiringSecret' => $expiringSecret]);
     }

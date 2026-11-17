@@ -2,18 +2,41 @@
 
 use App\Models\ExpiringSecret;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Mail\Transport\ArrayTransport;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Symfony\Component\Mailer\SentMessage;
+use Symfony\Component\Mime\Email;
 
 uses(LazilyRefreshDatabase::class);
 
-test('emails each recipient a unique secret with an independent view limit', function () {
+/**
+ * @return list<Email>
+ */
+function sentEmails(): array
+{
+    $transport = Mail::mailer()->getSymfonyTransport();
+    if (! $transport instanceof ArrayTransport) {
+        throw new RuntimeException('Expected the array mail transport.');
+    }
+
+    $emails = [];
+    foreach ($transport->messages() as $message) {
+        if (! $message instanceof SentMessage || ! $message->getOriginalMessage() instanceof Email) {
+            throw new RuntimeException('Expected a sent email.');
+        }
+        $emails[] = $message->getOriginalMessage();
+    }
+
+    return $emails;
+}
+
+test('emails each recipient a unique secret', function () {
     $this->travelTo('2026-01-01 12:00:00');
     $response = $this->post(route('store'), [
         'content' => 'private message',
         'expires_in' => 1,
         'expires_unit' => 'hours',
-        'remaining_views' => 1,
         'recipients' => " first@example.com \r\n\r\nsecond@example.com",
     ])->assertOk();
 
@@ -21,23 +44,26 @@ test('emails each recipient a unique secret with an independent view limit', fun
     expect($secrets)->toHaveCount(2);
     $recipientSecrets = $secrets->values();
     $response->assertSee('Secret sent to 2 users')->assertDontSee('<input', false);
-    $messages = Mail::mailer()->getSymfonyTransport()->messages();
+    $messages = collect(sentEmails());
     expect($messages)->toHaveCount(2);
-    expect($messages->map(fn ($message) => $message->getOriginalMessage()->getTo()[0]->getAddress())->all())
+    expect($messages->map(fn ($message) => $message->getTo()[0]->getAddress())->all())
         ->toBe(['first@example.com', 'second@example.com']);
     foreach ($messages as $message) {
-        expect($message->getOriginalMessage()->getHtmlBody())
+        expect($message->getHtmlBody())
             ->not->toContain('private message');
     }
     foreach ($recipientSecrets as $secret) {
-        expect($messages->filter(fn ($message) => str_contains($message->getOriginalMessage()->getHtmlBody(), route('show', $secret))))->toHaveCount(1);
+        expect($messages->filter(function (Email $message) use ($secret): bool {
+            $body = $message->getHtmlBody();
+
+            return is_string($body) && str_contains($body, route('show', $secret));
+        }))->toHaveCount(1);
         expect($secret->content)->toBe('private message');
         expect($secret->expires_at->format('Y-m-d H:i:s'))->toBe('2026-01-01 13:00:00');
-        expect($secret->remaining_views)->toBe(1);
     }
 
     $this->get(route('show', $recipientSecrets[0]))->assertOk();
-    $this->get(route('show', $recipientSecrets[0]))->assertNotFound();
+    $this->get(route('show', $recipientSecrets[0]))->assertOk();
     $this->get(route('show', $recipientSecrets[1]))->assertOk();
 });
 
@@ -46,7 +72,6 @@ test('confirms delivery to one user', function () {
         'content' => 'private message',
         'expires_in' => 1,
         'expires_unit' => 'hours',
-        'remaining_views' => 1,
         'recipients' => 'person@example.com',
     ])->assertOk()->assertSee('Secret sent to 1 user')->assertDontSee('<input', false);
 
@@ -58,7 +83,6 @@ test('shows a shareable link when the recipient field contains only blank lines'
         'content' => 'private message',
         'expires_in' => 1,
         'expires_unit' => 'hours',
-        'remaining_views' => 1,
         'recipients' => " \n ",
     ])->assertOk()->assertDontSee('Secret sent to');
 
@@ -70,12 +94,11 @@ test('rejects invalid recipient addresses before creating a secret', function ()
         'content' => 'private message',
         'expires_in' => 1,
         'expires_unit' => 'hours',
-        'remaining_views' => 1,
         'recipients' => "valid@example.com\ninvalid address",
     ])->assertSessionHasErrors('recipients');
 
     $this->assertDatabaseCount('expiring_secrets', 0);
-    expect(Mail::mailer()->getSymfonyTransport()->messages())->toBeEmpty();
+    expect(sentEmails())->toBeEmpty();
 });
 
 test('creates an encrypted secret with the requested expiry', function (string $unit, string $expectedExpiry) {
@@ -85,14 +108,12 @@ test('creates an encrypted secret with the requested expiry', function (string $
         'content' => 'private message',
         'expires_in' => 1,
         'expires_unit' => $unit,
-        'remaining_views' => 2,
     ]);
 
     $response->assertOk()->assertViewIs('expiringSecret.store');
     $secret = ExpiringSecret::query()->sole();
     expect($secret->content)->toBe('private message');
     expect($secret->expires_at->format('Y-m-d H:i:s'))->toBe($expectedExpiry);
-    expect($secret->remaining_views)->toBe(2);
     expect(DB::table('expiring_secrets')->value('content'))->not->toContain('private message');
     $response->assertSee(route('show', $secret));
 })->with([
@@ -106,13 +127,13 @@ test('creates an encrypted secret with the requested expiry', function (string $
 
 test('rejects missing secret details', function () {
     $this->post(route('store'), [])
-        ->assertSessionHasErrors(['content', 'expires_in', 'expires_unit', 'remaining_views']);
+        ->assertSessionHasErrors(['content', 'expires_in', 'expires_unit']);
 
     $this->assertDatabaseCount('expiring_secrets', 0);
 });
 
 test('rejects invalid secret details', function (string $field, mixed $value) {
-    $payload = ['content' => 'secret', 'expires_in' => 1, 'expires_unit' => 'hours', 'remaining_views' => 1];
+    $payload = ['content' => 'secret', 'expires_in' => 1, 'expires_unit' => 'hours'];
     $payload[$field] = $value;
 
     $this->post(route('store'), $payload)->assertSessionHasErrors($field);
@@ -122,8 +143,6 @@ test('rejects invalid secret details', function (string $field, mixed $value) {
     'content must be text' => ['content', ['secret']],
     'expiry must be an integer' => ['expires_in', 'invalid'],
     'expiry unit must be supported' => ['expires_unit', 'decades'],
-    'views must be an integer' => ['remaining_views', 'invalid'],
-    'views cannot be negative' => ['remaining_views', -1],
 ]);
 
 test('rejects expiry durations shorter than one unit', function (int $duration) {
@@ -131,37 +150,46 @@ test('rejects expiry durations shorter than one unit', function (int $duration) 
         'content' => 'secret',
         'expires_in' => $duration,
         'expires_unit' => 'hours',
-        'remaining_views' => 1,
     ])->assertSessionHasErrors(['expires_in' => 'The expires in field must be at least 1.']);
 
     $this->assertDatabaseCount('expiring_secrets', 0);
 })->with([0, -1]);
 
-test('shows a secret once, escaping its content and consuming its remaining view', function () {
+test('shows a secret repeatedly before expiry and escapes its content', function () {
     $this->travelTo('2026-01-01 12:00:00');
     $secret = ExpiringSecret::factory()->create([
         'content' => '<script>alert(1)</script>',
         'expires_at' => '2026-01-01 13:00:00',
-        'remaining_views' => 1,
     ]);
 
     $this->get(route('show', $secret))->assertOk()
         ->assertSee('<script>alert(1)</script>')
         ->assertDontSee('<script>alert(1)</script>', false);
 
-    expect($secret->fresh()->remaining_views)->toBe(0);
-    $this->get(route('show', $secret))->assertNotFound();
+    $this->get(route('show', $secret))->assertOk();
 });
 
-test('does not reveal or consume an expired secret', function () {
+test('deletes an expired secret without revealing it', function () {
     $this->travelTo('2026-01-01 12:00:00');
     $secret = ExpiringSecret::factory()->create([
         'content' => 'private message',
         'expires_at' => '2026-01-01 12:00:00',
-        'remaining_views' => 1,
     ]);
 
     $this->get(route('show', $secret))->assertNotFound()->assertDontSee('private message');
 
-    expect($secret->fresh()->remaining_views)->toBe(1);
+    $this->assertModelMissing($secret);
+});
+
+test('prunes expired secrets while retaining unexpired secrets', function () {
+    $this->travelTo('2026-01-01 12:00:00');
+    $expired = ExpiringSecret::factory()->create(['content' => 'expired', 'expires_at' => '2026-01-01 11:59:59']);
+    $atExpiry = ExpiringSecret::factory()->create(['content' => 'at expiry', 'expires_at' => '2026-01-01 12:00:00']);
+    $active = ExpiringSecret::factory()->create(['content' => 'active', 'expires_at' => '2026-01-01 12:00:01']);
+
+    $this->artisan('model:prune', ['--model' => [ExpiringSecret::class]]);
+
+    $this->assertModelMissing($expired);
+    $this->assertModelMissing($atExpiry);
+    $this->assertModelExists($active);
 });

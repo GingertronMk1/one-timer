@@ -30,7 +30,6 @@ class StoreExpiringSecretRequest extends FormRequest
             'content' => ['required', 'string'],
             'expires_in' => ['required', 'integer', 'min:1'],
             'expires_unit' => ['required', Rule::in(array_map(fn (UnitEnum $val) => $val->value, TimeUnit::cases()))],
-            'remaining_views' => ['required', 'integer', 'min:0'],
             'recipients' => ['nullable', 'string', function (string $attribute, mixed $value, \Closure $fail): void {
                 if (! is_string($value)) {
                     return;
@@ -59,7 +58,7 @@ class StoreExpiringSecretRequest extends FormRequest
         }
 
         return array_values(array_filter(
-            array_map('trim', preg_split('/\R/', $recipients)),
+            array_map('trim', preg_split('/\R/', $recipients) ?: []),
             fn (string $recipient): bool => $recipient !== '',
         ));
     }
