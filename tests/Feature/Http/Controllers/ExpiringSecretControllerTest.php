@@ -2,10 +2,34 @@
 
 use App\Models\ExpiringSecret;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Mail\Transport\ArrayTransport;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Symfony\Component\Mailer\SentMessage;
+use Symfony\Component\Mime\Email;
 
 uses(LazilyRefreshDatabase::class);
+
+/**
+ * @return list<Email>
+ */
+function sentEmails(): array
+{
+    $transport = Mail::mailer()->getSymfonyTransport();
+    if (! $transport instanceof ArrayTransport) {
+        throw new RuntimeException('Expected the array mail transport.');
+    }
+
+    $emails = [];
+    foreach ($transport->messages() as $message) {
+        if (! $message instanceof SentMessage || ! $message->getOriginalMessage() instanceof Email) {
+            throw new RuntimeException('Expected a sent email.');
+        }
+        $emails[] = $message->getOriginalMessage();
+    }
+
+    return $emails;
+}
 
 test('emails each recipient a unique secret', function () {
     $this->travelTo('2026-01-01 12:00:00');
@@ -20,16 +44,20 @@ test('emails each recipient a unique secret', function () {
     expect($secrets)->toHaveCount(2);
     $recipientSecrets = $secrets->values();
     $response->assertSee('Secret sent to 2 users')->assertDontSee('<input', false);
-    $messages = Mail::mailer()->getSymfonyTransport()->messages();
+    $messages = collect(sentEmails());
     expect($messages)->toHaveCount(2);
-    expect($messages->map(fn ($message) => $message->getOriginalMessage()->getTo()[0]->getAddress())->all())
+    expect($messages->map(fn ($message) => $message->getTo()[0]->getAddress())->all())
         ->toBe(['first@example.com', 'second@example.com']);
     foreach ($messages as $message) {
-        expect($message->getOriginalMessage()->getHtmlBody())
+        expect($message->getHtmlBody())
             ->not->toContain('private message');
     }
     foreach ($recipientSecrets as $secret) {
-        expect($messages->filter(fn ($message) => str_contains($message->getOriginalMessage()->getHtmlBody(), route('show', $secret))))->toHaveCount(1);
+        expect($messages->filter(function (Email $message) use ($secret): bool {
+            $body = $message->getHtmlBody();
+
+            return is_string($body) && str_contains($body, route('show', $secret));
+        }))->toHaveCount(1);
         expect($secret->content)->toBe('private message');
         expect($secret->expires_at->format('Y-m-d H:i:s'))->toBe('2026-01-01 13:00:00');
     }
@@ -70,7 +98,7 @@ test('rejects invalid recipient addresses before creating a secret', function ()
     ])->assertSessionHasErrors('recipients');
 
     $this->assertDatabaseCount('expiring_secrets', 0);
-    expect(Mail::mailer()->getSymfonyTransport()->messages())->toBeEmpty();
+    expect(sentEmails())->toBeEmpty();
 });
 
 test('creates an encrypted secret with the requested expiry', function (string $unit, string $expectedExpiry) {
@@ -159,7 +187,7 @@ test('prunes expired secrets while retaining unexpired secrets', function () {
     $atExpiry = ExpiringSecret::factory()->create(['content' => 'at expiry', 'expires_at' => '2026-01-01 12:00:00']);
     $active = ExpiringSecret::factory()->create(['content' => 'active', 'expires_at' => '2026-01-01 12:00:01']);
 
-    $this->artisan('model:prune', ['--model' => [ExpiringSecret::class]])->assertSuccessful();
+    $this->artisan('model:prune', ['--model' => [ExpiringSecret::class]]);
 
     $this->assertModelMissing($expired);
     $this->assertModelMissing($atExpiry);

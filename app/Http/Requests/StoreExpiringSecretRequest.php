@@ -58,7 +58,7 @@ class StoreExpiringSecretRequest extends FormRequest
         }
 
         return array_values(array_filter(
-            array_map('trim', preg_split('/\R/', $recipients)),
+            array_map('trim', preg_split('/\R/', $recipients) ?: []),
             fn (string $recipient): bool => $recipient !== '',
         ));
     }

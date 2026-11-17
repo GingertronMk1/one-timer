@@ -69,6 +69,10 @@ jobs:
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: vendor/bin/sail bin pint --test
 
+      - name: Run static analysis
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: vendor/bin/sail composer analyse
+
       - name: Check frontend formatting
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: vendor/bin/sail npm run format:check
