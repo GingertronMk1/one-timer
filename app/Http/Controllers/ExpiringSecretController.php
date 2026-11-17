@@ -30,7 +30,6 @@ class ExpiringSecretController extends Controller
         $expiringSecret = new ExpiringSecret;
         $expiringSecret->expires_at = $expiry;
         $expiringSecret->content = $validated['content'];
-        $expiringSecret->remaining_views = $validated['remaining_views'];
         $recipients = $request->recipients();
 
         if ($recipients === [] && ! $expiringSecret->save()) {
@@ -58,10 +57,11 @@ class ExpiringSecretController extends Controller
 
     public function show(ExpiringSecret $expiringSecret): View
     {
-        if (! $expiringSecret->canView()) {
+        if ($expiringSecret->expires_at <= now()) {
+            $expiringSecret->delete();
+
             abort(404);
         }
-        $expiringSecret->removeView();
 
         return view('expiringSecret.show', ['expiringSecret' => $expiringSecret]);
     }

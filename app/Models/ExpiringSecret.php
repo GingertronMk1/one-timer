@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use Database\Factories\ExpiringSecretFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Prunable;
 
 class ExpiringSecret extends Model
 {
@@ -13,6 +15,7 @@ class ExpiringSecret extends Model
     use HasFactory;
 
     use HasUuids;
+    use Prunable;
 
     protected function casts(): array
     {
@@ -22,15 +25,8 @@ class ExpiringSecret extends Model
         ];
     }
 
-    public function removeView(): bool
+    public function prunable(): Builder
     {
-        $this->remaining_views--;
-
-        return $this->save();
-    }
-
-    public function canView(): bool
-    {
-        return $this->remaining_views > 0 && $this->expires_at > now();
+        return static::where('expires_at', '<=', now());
     }
 }

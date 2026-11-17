@@ -6,7 +6,7 @@ use Laravel\Dusk\Browser;
 
 uses(DatabaseMigrations::class);
 
-test('a secret can be shared and viewed once', function () {
+test('a secret can be shared and viewed repeatedly before expiry', function () {
     Http::retry(20, 250)->get(config('app.url'))->throw();
 
     $this->browse(function (Browser $browser) {
@@ -20,6 +20,6 @@ test('a secret can be shared and viewed once', function () {
         $browser->visit($secretUrl)
             ->assertSee('A private message')
             ->refresh()
-            ->assertDontSee('A private message');
+            ->assertSee('A private message');
     });
 });

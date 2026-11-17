@@ -40,19 +40,6 @@
                 @endforeach
             </select>
         </div>
-        <div class="flex flex-row items-center gap-2">
-            <span>Viewable</span>
-            <input
-                type="number"
-                name="remaining_views"
-                id="remaining_views"
-                min="0"
-                step="1"
-                class="w-16 rounded-md border-2 border-black p-2"
-                value="1"
-            />
-            <span>times</span>
-        </div>
         <label for="recipients">
             <span class="flex flex-row items-center">
                 <span class="mr-auto text-2xl">Email recipients (optional)</span>
@@ -60,9 +47,7 @@
                     <span class="text-red-500">{{ $message }}</span>
                 @enderror
             </span>
-            <span class="block"
-                >Enter one email address per line. Each recipient will receive their own link with its own view
-                limit.</span>
+            <span class="block">Enter one email address per line. Each recipient will receive their own link.</span>
             <textarea
                 name="recipients"
                 id="recipients"
